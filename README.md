@@ -1,6 +1,6 @@
 # Vite Source Code Delivery Plugin Demo
 
-这个项目演示了如何创建一个Vite插件，该插件可以在打包时将引用的其它packages的源代码一起打包，方便将完整的源代码交付给客户进行安全验证。
+这个项目演示了如何创建一个Vite插件，该插件可以在打包时将引用的其它packages的源代码一起打包，方便将完整的源代码交付给客户进行安全验证。插件会智能分析代码依赖关系，只复制实际被使用的源文件。
 
 ## 项目结构
 
@@ -35,7 +35,9 @@ export function myPlugin(): Plugin {
 }
 ```
 
-本项目中的`source-code-delivery`插件主要使用了`closeBundle`钩子，在打包完成后将源代码复制到dist目录。
+本项目中的`source-code-delivery`插件使用了以下钩子：
+- `transform`: 用于分析和收集代码依赖关系
+- `closeBundle`: 在打包完成后将源代码复制到dist目录
 
 ## 使用方式
 
@@ -57,14 +59,20 @@ pnpm build
 构建完成后，你会在`dist`目录下看到：
 - 正常的构建输出（如`index.html`、`assets`等）
 - `src`目录（包含主应用的源代码）
-- `packages`目录（包含依赖包的源代码）
+- `packages`目录（只包含实际被引用的依赖包源代码）
 
 ## 插件工作原理
 
-1. 插件在项目构建完成后（`closeBundle`钩子）触发
-2. 扫描项目中的`src`和`packages`目录
-3. 将这些目录的内容复制到`dist`目录下对应的位置
-4. 这样最终的构建输出中就包含了完整的源代码
+1. 在代码转换阶段（`transform`钩子）：
+   - 分析每个被处理的模块
+   - 收集来自`packages`目录的依赖文件路径
+
+2. 在构建完成后（`closeBundle`钩子）：
+   - 复制完整的`src`目录到`dist/src`
+   - 只复制被实际引用的`packages`文件到`dist/packages`
+   - 保持原始的目录结构
+
+这种方式确保了最终的输出只包含实际被使用的源代码，类似于JavaScript的tree-shaking机制。
 
 ## 配置说明
 
@@ -94,5 +102,7 @@ export default defineConfig({
 ## 注意事项
 
 1. 确保`packages`目录中的源代码是你希望交付给客户的
-2. 插件会复制整个目录结构，所以要注意排除不必要的文件
-3. 在生产环境中使用时，建议添加文件过滤规则 
+2. 插件现在只复制实际被引用的文件，这可以显著减少输出大小
+3. 由于使用了依赖分析，确保你的代码使用ES模块语法（import/export）
+4. 动态导入（dynamic imports）也会被正确处理
+5. 如果需要复制额外的文件，可以修改插件的`transform`钩子的过滤条件

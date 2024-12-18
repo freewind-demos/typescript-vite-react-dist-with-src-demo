@@ -1,5 +1,7 @@
+import { helloInner } from "./hello-inner"
+
 const sayHello = (name: string): string => {
-    return `Hello, ${name}!`
+    return helloInner(name)
 }
 
 export default sayHello 

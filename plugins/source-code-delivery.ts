@@ -2,42 +2,52 @@ import { Plugin } from 'vite'
 import * as fs from 'fs'
 import * as path from 'path'
 
-function copyDirectory(src: string, dest: string) {
-    if (!fs.existsSync(dest)) {
-        fs.mkdirSync(dest, { recursive: true })
+function copyFile(src: string, dest: string) {
+    if (!fs.existsSync(path.dirname(dest))) {
+        fs.mkdirSync(path.dirname(dest), { recursive: true })
     }
-
-    const entries = fs.readdirSync(src, { withFileTypes: true })
-
-    for (const entry of entries) {
-        const srcPath = path.join(src, entry.name)
-        const destPath = path.join(dest, entry.name)
-
-        if (entry.isDirectory()) {
-            copyDirectory(srcPath, destPath)
-        } else {
-            fs.copyFileSync(srcPath, destPath)
-        }
-    }
+    fs.copyFileSync(src, dest)
 }
 
 export function sourceCodeDelivery(): Plugin {
+    const usedFiles = new Set<string>()
+
     return {
         name: 'source-code-delivery',
+
+        // 在转换代码时收集依赖信息
+        async transform(code: string, id: string) {
+            if (id.includes('/packages/')) {
+                usedFiles.add(id)
+            }
+            return null
+        },
+
+        // 在构建完成后复制源代码
         closeBundle() {
             const srcDir = path.resolve('src')
-            const packagesDir = path.resolve('packages')
             const distSrcDir = path.resolve('dist/src')
-            const distPackagesDir = path.resolve('dist/packages')
 
-            // Copy source code
+            // 复制src目录
             if (fs.existsSync(srcDir)) {
-                copyDirectory(srcDir, distSrcDir)
+                const entries = fs.readdirSync(srcDir, { withFileTypes: true })
+                for (const entry of entries) {
+                    const srcPath = path.join(srcDir, entry.name)
+                    const destPath = path.join(distSrcDir, entry.name)
+                    if (entry.isDirectory()) {
+                        fs.mkdirSync(destPath, { recursive: true })
+                        fs.cpSync(srcPath, destPath, { recursive: true })
+                    } else {
+                        copyFile(srcPath, destPath)
+                    }
+                }
             }
 
-            // Copy packages
-            if (fs.existsSync(packagesDir)) {
-                copyDirectory(packagesDir, distPackagesDir)
+            // 只复制被使用的packages文件
+            for (const file of Array.from(usedFiles)) {
+                const relativePath = path.relative(process.cwd(), file)
+                const destPath = path.resolve('dist', relativePath)
+                copyFile(file, destPath)
             }
         }
     }
