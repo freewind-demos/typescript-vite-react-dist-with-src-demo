@@ -1,0 +1,6 @@
+{
+    "name": "@packages/utils",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "hello.ts"
+} 
